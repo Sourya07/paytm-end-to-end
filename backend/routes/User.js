@@ -1,56 +1,77 @@
-const express =require("express")
-const app = express()
+const express = require("express");
+const app = express();
 const router = express.Router();
 const zod = require("zod");
 const { User, Account } = require("../db");
 const JWT_SECRET = require("../config");
 const jwt = require("jsonwebtoken");
-const  { authMiddleware } = require("../middleware");
+const { authMiddleware } = require("../middleware");
+
 const signupSchema = zod.object({
     username: zod.string().email(),
-	firstName: zod.string(),
-	lastName: zod.string(),
-	password: zod.string()
-})
+    firstName: zod.string(),
+    lastName: zod.string(),
+    password: zod.string()
+});
 
-
-router.post("/signup", async(req,res)=>{
-    const body =req.body
-    const {success} = signupSchema.safeParse(req.body)
-    console.log(success)
-    if(!success){
-        return res.json({
-            message:"email already taken /incorrect outputs"
-        })
-    }
+router.post("/signup", async (req, res) => {
+    const body = req.body;
     
-    const user = User.find({
-        username: req.body.username
-    })
-    console.log(user._id)
-    if(user){
-        return res.json({
-            message:"username already taken"
-            })
+    // Validate the request body against the signup schema
+    const { success, error } = signupSchema.safeParse(req.body);
+    if (!success) {
+        console.log("Validation failed:", error.errors);
+        return res.status(400).json({
+            message: "Invalid input",
+            errors: error.errors
+        });
     }
 
-    const dbuser = await User.create(body);
-    const userId=dbuser._id
+    try {
+        // Check if the username already exists
+        const user = await User.findOne({
+            username: req.body.username
+        });
+        
+        if (user) {
+            console.log("Username already taken:", req.body.username);
+            return res.status(400).json({
+                message: "Username already taken"
+            });
+        }
 
-    await Account.create({
-        userId,
-        balance: 1 + Math.random() * 10000
-    })
-    const token =jwt.sign({
-        userId:dbuser._id
-    },JWT_SECRET)
- 
+        // Create a new user in the database
+        const dbuser = await User.create(body);
+        console.log("User created:", dbuser);
 
-    res.json({
-        message:"user created successfully",
-        token
-    })
-})
+        const userId = dbuser._id;
+
+        // Create an associated account with a random balance
+        await Account.create({
+            userId,
+            balance: 1 + Math.random() * 10000
+        });
+        console.log("Account created for user:", userId);
+
+        // Generate a JWT token
+        const token = jwt.sign({
+            userId: dbuser._id
+        }, JWT_SECRET);
+
+        // Respond with success message and token
+        res.json({
+            message: "User created successfully",
+            token
+        });
+
+    } catch (error) {
+        console.error("Error during signup:", error);
+        res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+});
+
 
 
 router.post("/signin", async (req, res) => {
