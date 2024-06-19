@@ -72,6 +72,11 @@ router.post("/signup", async (req, res) => {
     }
 });
 
+const signinBody = zod.object({
+    password: zod.string().optional(),
+    firstName: zod.string().optional(),
+
+})
 
 
 router.post("/signin", async (req, res) => {
@@ -105,7 +110,7 @@ router.post("/signin", async (req, res) => {
 })
 
 const updateBody = zod.object({
-	password: zod.string().optional(),
+    password: zod.string().optional(),
     firstName: zod.string().optional(),
     lastName: zod.string().optional(),
 })
@@ -117,6 +122,8 @@ router.put("/", authMiddleware, async (req, res) => {
             message: "Error while updating information"
         })
     }
+    console.log(success)
+
 
     await User.updateOne(req.body, {
         id: req.userId
